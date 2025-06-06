@@ -23,24 +23,28 @@ a-thr3 a-asn4
 b-thr3 b-asn4
 "
 
+chains="a b"
+
 echo "DSSP Full"
 echo "Start: $(date)"
-./dssp_calculation.py \
+./dssp-analysis.py \
 	             --pdb-file ${PDB_file} \
 		     --trajectory-files ${Traj_files} \
 		     --stride ${stride} \
 		     --residue-set ${residue_set} \
+		     --output-chains ${chains} \
 		     --output-file dssp.data
 echo "End: $(date)"
 echo " "
 
 echo "DSSP Simplifed"
 echo "Start: $(date)"
-./dssp_calculation.py \
+./dssp-analysis.py \
                      --pdb-file ${PDB_file} \
                      --trajectory-files ${Traj_files} \
                      --stride ${stride} \
 		     --residue-set ${residue_set} \
+		     --output-chains ${chains} \
 		     --simplifed \
                      --output-file dssp.simplifed.data
 echo "End: $(date)"
