@@ -7,12 +7,13 @@ import time
 
 parser = argparse.ArgumentParser(conflict_handler="resolve")
 
-parser.add_argument("--pdb-file", type=str, required=True)
-parser.add_argument("--trajectory-files",     type=str, required=True, nargs="*")
-parser.add_argument("--residue-set",     type=str, required=False, nargs="*")
-parser.add_argument("--output-file",   type=str, required=False, default="dssp.data")
-parser.add_argument("--stride",   type=int, required=False, default=1)
-parser.add_argument("--simplifed", action="store_true", required=False)
+parser.add_argument("--pdb-file",             type=str, required=True)
+parser.add_argument("--trajectory-files",     type=str, required=True,  nargs="*")
+parser.add_argument("--residue-set",          type=str, required=False, nargs="*")
+parser.add_argument("--output-file",          type=str, required=False, default="dssp.data")
+parser.add_argument("--stride",               type=int, required=False, default=1)
+parser.add_argument("--output-chains",        type=str, required=False, nargs="*")
+parser.add_argument("--simplifed",            action="store_true", required=False)
 
 args = parser.parse_args()
 
@@ -22,7 +23,6 @@ simplified=args.simplifed
 dssp_fn = args.output_file
 stride=args.stride
 # dssp_fracton_fn = "dssp.fraction.data"
-
 
 LoopsAndIrregular_Code="L"
 if not simplified:
@@ -53,11 +53,19 @@ if simplified:
 
 chain_labels = ["a","b","c","d","e","f","g"]
 
+f_dssp = []
 # To make sure that the `total_sasa_fn` file
 # is started clean for the run
-f_dssp = open(dssp_fn,"w")
-f_dssp.close()
-f_dssp = open(dssp_fn,"a")
+if args.output_chains:
+    for c in args.output_chains:
+        dssp_fn_chain = ".chain-{:s}.".format(c.lower()).join(dssp_fn.rsplit(".",1 ))
+        f_tmp = open(dssp_fn_chain,"w")
+        f_tmp.close()
+        f_dssp.append(open(dssp_fn_chain,"a"))
+else:
+    f_tmp = open(dssp_fn,"w")
+    f_tmp.close()
+    f_dssp.append(open(dssp_fn,"a"))
 
 if args.residue_set:
     dssp_fn_residue_set = ".residue-set.".join(dssp_fn.rsplit(".",1 ))
@@ -90,6 +98,7 @@ for trj in traj_files:
             res_str = "{0:1s}-{1:s}".format(ch,str(r).lower())
             residues_str.append(res_str)
     #
+
     residue_set_id = []
     residue_set_str = []
     if args.residue_set:
@@ -101,11 +110,29 @@ for trj in traj_files:
             except ValueError as ve:
                 print("Warning: cannot find {:s} among the residue labels, ignored".format(res))
 
-    np.savetxt(f_dssp,
-                X = np.concatenate((time_traj,dssp),axis=1),
-                header=header_time + " ".join(residues_str) + "\n"+AssignmentCodes,
-                comments="",
-                fmt="%s")
+    res_indices = []
+    res_strings = []
+    if args.output_chains:
+        for ch in args.output_chains:
+            id_tmp = [i for i in range(len(residues_str)) if residues_str[i][0:1] == ch.lower()]
+            str_tmp = [r for r in residues_str if r[0:1] == ch.lower()]
+            if len(id_tmp)==0: 
+                print("Error: cannot find chain {:s} among the chains".format(ch))
+                exit()
+            res_indices.append(id_tmp)
+            res_strings.append(str_tmp)
+    else:
+        id_tmp = [i for i in range(len(residues_str))]
+        res_indices.append(id_tmp)
+        res_strings.append(residues_str)
+
+    for f,ids,res in zip(f_dssp,res_indices,res_strings):
+        np.savetxt(f,
+                   X = np.concatenate((time_traj,dssp[:,ids]),axis=1),
+                   header=header_time + " ".join(res) + "\n"+AssignmentCodes,
+                   comments="",
+                   fmt="%s")
+
     if args.residue_set:
         np.savetxt(f_dssp_residue_set,
                 X = np.concatenate((time_traj,dssp[:,residue_set_id]),axis=1),
@@ -115,5 +142,6 @@ for trj in traj_files:
     end_time_loop = time.perf_counter() 
     print(" - Elapsed time: {:0.1f} seconds".format(end_time_loop-start_time_loop))
 
-f_dssp.close()
+for f in f_dssp:
+    f.close()
 if args.residue_set: f_dssp_residue_set.close()
